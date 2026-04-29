@@ -516,20 +516,21 @@ class Elbishion_Admin_Menu {
 			return $data;
 		}
 
-		$display = array();
+		$display            = array();
+		$has_course_context = self::has_course_context( $data['fields'] );
 
 		foreach ( $data['fields'] as $field ) {
 			if ( ! is_array( $field ) ) {
 				continue;
 			}
 
-			$label = ! empty( $field['field_label'] ) ? $field['field_label'] : ( $field['label'] ?? ( $field['field_id'] ?? ( $field['id'] ?? __( 'Field', 'elbishion' ) ) ) );
-			$value = $field['field_value'] ?? ( $field['value'] ?? '' );
-			$key   = $label;
+			$original_label = ! empty( $field['field_label'] ) ? $field['field_label'] : ( $field['label'] ?? ( $field['field_id'] ?? ( $field['id'] ?? __( 'Field', 'elbishion' ) ) ) );
+			$value          = $field['field_value'] ?? ( $field['value'] ?? '' );
+			$field_id       = $field['field_id'] ?? ( $field['id'] ?? '' );
+			$label          = self::display_field_label( $original_label, $field_id, $value, $has_course_context );
+			$key            = $label;
 
-			$field_id = $field['field_id'] ?? ( $field['id'] ?? '' );
-
-			if ( ! empty( $field_id ) && strtolower( (string) $field_id ) !== strtolower( (string) $label ) ) {
+			if ( ! empty( $field_id ) && ! self::same_readable_label( $label, $field_id ) && ! self::label_was_corrected( $label, $original_label ) ) {
 				$key = sprintf( '%1$s (%2$s)', $label, $field_id );
 			}
 
@@ -537,6 +538,122 @@ class Elbishion_Admin_Menu {
 		}
 
 		return $display;
+	}
+
+	/**
+	 * Normalize a field label for the admin detail view.
+	 *
+	 * @param string $label Existing label.
+	 * @param string $field_id Field ID.
+	 * @param mixed  $value Field value.
+	 * @param bool   $has_course_context Whether sibling fields describe course metadata.
+	 * @return string
+	 */
+	private static function display_field_label( $label, $field_id, $value, $has_course_context = false ) {
+		$label      = trim( (string) $label );
+		$field_id   = trim( (string) $field_id );
+		$value_text = is_scalar( $value ) ? trim( (string) $value ) : '';
+
+		if ( self::is_course_name_key( $label ) || self::is_course_name_key( $field_id ) ) {
+			return __( 'კურსის დასახელება', 'elbishion' );
+		}
+
+		if ( $has_course_context && '' !== $value_text && self::same_readable_label( $label, $value_text ) ) {
+			return __( 'კურსის დასახელება', 'elbishion' );
+		}
+
+		return '' !== $label ? $label : __( 'Field', 'elbishion' );
+	}
+
+	/**
+	 * Check if the submission includes course-related fields.
+	 *
+	 * @param array $fields Normalized fields.
+	 * @return bool
+	 */
+	private static function has_course_context( $fields ) {
+		foreach ( $fields as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$label = (string) ( $field['field_label'] ?? ( $field['label'] ?? '' ) );
+			$id    = (string) ( $field['field_id'] ?? ( $field['id'] ?? '' ) );
+
+			if ( self::contains_text( $label, array( 'კურსის ფასი', 'ხანგრძლივობა', 'course price', 'duration' ) ) || self::contains_text( $id, array( 'course_price', 'course-price', 'duration' ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether a field key is intended to hold a course title/name.
+	 *
+	 * @param string $value Field label or ID.
+	 * @return bool
+	 */
+	private static function is_course_name_key( $value ) {
+		return self::contains_text(
+			$value,
+			array(
+				'course name',
+				'course title',
+				'course_name',
+				'course-title',
+				'კურსის დასახელება',
+				'კურსის სახელი',
+			)
+		);
+	}
+
+	/**
+	 * Case-insensitive contains helper for ASCII while keeping Georgian text intact.
+	 *
+	 * @param string $value Haystack.
+	 * @param array  $needles Needles.
+	 * @return bool
+	 */
+	private static function contains_text( $value, $needles ) {
+		$value       = (string) $value;
+		$value_lower = strtolower( $value );
+
+		foreach ( $needles as $needle ) {
+			$needle       = (string) $needle;
+			$needle_lower = strtolower( $needle );
+
+			if ( false !== strpos( $value_lower, $needle_lower ) || false !== strpos( $value, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Compare human-readable versions of two field labels/IDs.
+	 *
+	 * @param string $left First label.
+	 * @param string $right Second label.
+	 * @return bool
+	 */
+	private static function same_readable_label( $left, $right ) {
+		$left  = strtolower( trim( self::humanize_key( $left ) ) );
+		$right = strtolower( trim( self::humanize_key( $right ) ) );
+
+		return '' !== $left && $left === $right;
+	}
+
+	/**
+	 * Determine if label normalization intentionally changed the label.
+	 *
+	 * @param string $label Corrected label.
+	 * @param string $original_label Original label.
+	 * @return bool
+	 */
+	private static function label_was_corrected( $label, $original_label ) {
+		return ! self::same_readable_label( $label, $original_label );
 	}
 
 	/**
