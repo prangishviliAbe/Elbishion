@@ -1,0 +1,537 @@
+<?php
+/**
+ * Admin submissions list table.
+ *
+ * @package Elbishion
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! class_exists( 'WP_List_Table' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
+}
+
+/**
+ * Modern submissions table.
+ */
+class Elbishion_Admin_List extends WP_List_Table {
+
+	/**
+	 * Active status filter.
+	 *
+	 * @var string
+	 */
+	private $status = '';
+
+	/**
+	 * Current admin message.
+	 *
+	 * @var string
+	 */
+	private $message = '';
+
+	/**
+	 * Form names for dropdown.
+	 *
+	 * @var array
+	 */
+	private $form_names = array();
+
+	/**
+	 * Constructor.
+	 *
+	 * @param string $status Status filter.
+	 */
+	public function __construct( $status = '' ) {
+		parent::__construct(
+			array(
+				'singular' => 'submission',
+				'plural'   => 'submissions',
+				'ajax'     => false,
+			)
+		);
+
+		$this->status     = in_array( $status, Elbishion_Database::ALLOWED_STATUSES, true ) ? $status : '';
+		$this->form_names = Elbishion_Database::get_form_names();
+	}
+
+	/**
+	 * Get columns.
+	 *
+	 * @return array
+	 */
+	public function get_columns() {
+		return array(
+			'cb'           => '<input type="checkbox">',
+			'status'       => __( 'სტატუსი', 'elbishion' ),
+			'form_name'    => __( 'სახელი და გვარი', 'elbishion' ),
+			'contact'      => __( 'საკონტაქტო ინფორმაცია', 'elbishion' ),
+			'message'      => __( 'შეტყობინება', 'elbishion' ),
+			'page_url'     => __( 'გვერდის ბმული', 'elbishion' ),
+			'created_at'   => __( 'თარიღი', 'elbishion' ),
+			'row_actions'  => __( 'ქმედებები', 'elbishion' ),
+		);
+	}
+
+	/**
+	 * Sortable columns.
+	 *
+	 * @return array
+	 */
+	public function get_sortable_columns() {
+		return array(
+			'created_at' => array( 'created_at', true ),
+		);
+	}
+
+	/**
+	 * Bulk actions.
+	 *
+	 * @return array
+	 */
+	protected function get_bulk_actions() {
+		return array(
+			'mark_read'   => __( 'წაკითხულად მონიშვნა', 'elbishion' ),
+			'mark_unread' => __( 'წაუკითხავად მონიშვნა', 'elbishion' ),
+			'star'        => __( 'ვარსკვლავით მონიშვნა', 'elbishion' ),
+			'archive'     => __( 'დაარქივება', 'elbishion' ),
+			'export'      => __( 'CSV ექსპორტი', 'elbishion' ),
+			'delete'      => __( 'წაშლა', 'elbishion' ),
+		);
+	}
+
+	/**
+	 * Prepare table data.
+	 */
+	public function prepare_items() {
+		$this->process_bulk_action();
+
+		$settings = Elbishion_Settings::get_settings();
+		$per_page = absint( $settings['items_per_page'] );
+		$paged    = max( 1, absint( $_REQUEST['paged'] ?? 1 ) );
+		$order    = isset( $_REQUEST['order'] ) && 'asc' === strtolower( sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) ) ? 'ASC' : 'DESC';
+		$args     = array(
+			'status'    => $this->status ? $this->status : $this->request_value( 'status' ),
+			'search'    => $this->request_value( 's' ),
+			'form_name' => $this->request_value( 'form_name' ),
+			'date_from' => $this->request_value( 'date_from' ),
+			'date_to'   => $this->request_value( 'date_to' ),
+			'order'     => $order,
+			'per_page'  => $per_page,
+			'offset'    => ( $paged - 1 ) * $per_page,
+		);
+
+		if ( ! in_array( $args['status'], Elbishion_Database::ALLOWED_STATUSES, true ) ) {
+			$args['status'] = '';
+		}
+
+		$total_items = Elbishion_Database::count_submissions( $args );
+		$this->items = Elbishion_Database::get_submissions( $args );
+
+		$this->_column_headers = array( $this->get_columns(), array(), $this->get_sortable_columns(), 'form_name' );
+
+		$this->set_pagination_args(
+			array(
+				'total_items' => $total_items,
+				'per_page'    => $per_page,
+				'total_pages' => (int) ceil( $total_items / $per_page ),
+			)
+		);
+	}
+
+	/**
+	 * Print admin notice from actions.
+	 */
+	public function maybe_print_notice() {
+		if ( empty( $this->message ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-success is-dismissible"><p>%s</p></div>',
+			esc_html( $this->message )
+		);
+	}
+
+	/**
+	 * Default column output.
+	 *
+	 * @param object $item Row.
+	 * @param string $column_name Column name.
+	 * @return string
+	 */
+	public function column_default( $item, $column_name ) {
+		switch ( $column_name ) {
+			case 'status':
+				return $this->column_status( $item );
+			case 'form_name':
+				return $this->column_form_name( $item );
+			case 'contact':
+				return $this->column_contact( $item );
+			case 'message':
+				return $this->column_message( $item );
+			case 'page_url':
+				return $this->column_page_url( $item );
+			case 'created_at':
+				return $this->column_created_at( $item );
+			case 'row_actions':
+				return $this->column_actions( $item );
+			default:
+				return '';
+		}
+	}
+
+	/**
+	 * Checkbox column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_cb( $item ) {
+		return sprintf( '<input type="checkbox" name="submissions[]" value="%d">', absint( $item->id ) );
+	}
+
+	/**
+	 * Status indicator.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_status( $item ) {
+		return sprintf(
+			'<span class="elbishion-status-dot elbishion-status-%1$s" title="%2$s"></span><span class="screen-reader-text">%2$s</span>',
+			esc_attr( $item->status ),
+			esc_attr( self::status_label( $item->status ) )
+		);
+	}
+
+	/**
+	 * Form name column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_form_name( $item ) {
+		$data  = Elbishion_Database::decode_data( $item->submitted_data );
+		$name  = $this->find_value( $data, array( 'name', 'full name', 'first name', 'სახელი', 'სახელი და გვარი', 'სრული სახელი' ) );
+		$title = $name ? $name : $item->form_name;
+		$url = add_query_arg(
+			array(
+				'page' => 'elbishion',
+				'view' => 'detail',
+				'id'   => absint( $item->id ),
+			),
+			admin_url( 'admin.php' )
+		);
+
+		return sprintf(
+			'<a class="elbishion-primary-link" href="%1$s">%2$s</a><div class="elbishion-row-id">%3$s · #%4$d</div>',
+			esc_url( $url ),
+			esc_html( $title ),
+			esc_html( $item->form_name ),
+			absint( $item->id )
+		);
+	}
+
+	/**
+	 * Main contact info column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_contact( $item ) {
+		$data  = Elbishion_Database::decode_data( $item->submitted_data );
+		$name  = $this->find_value( $data, array( 'name', 'full name', 'first name', 'სახელი', 'სახელი და გვარი', 'სრული სახელი' ) );
+		$email = $this->find_value( $data, array( 'email', 'email address', 'ელფოსტა', 'ელ. ფოსტა', 'ელ-ფოსტა', 'მეილი', 'e-mail' ) );
+		$phone = $this->find_value( $data, array( 'phone', 'telephone', 'mobile', 'phone_number', 'ტელეფონი', 'მობილური', 'ტელეფონის ნომერი' ) );
+		$html  = '';
+
+		if ( $name ) {
+			$html .= '<strong>' . esc_html( $name ) . '</strong>';
+		}
+
+		if ( $email ) {
+			$html .= '<span><a href="mailto:' . esc_attr( $email ) . '">' . esc_html( $email ) . '</a></span>';
+		}
+
+		if ( $phone ) {
+			$html .= '<span>' . esc_html( $phone ) . '</span>';
+		}
+
+		return $html ? '<div class="elbishion-contact-stack">' . $html . '</div>' : '<span class="elbishion-muted">&mdash;</span>';
+	}
+
+	/**
+	 * Message preview column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_message( $item ) {
+		$data    = Elbishion_Database::decode_data( $item->submitted_data );
+		$message = $this->find_message_preview( $data );
+
+		return '<span class="elbishion-message-preview">' . esc_html( wp_trim_words( (string) $message, 18, '...' ) ) . '</span>';
+	}
+
+	/**
+	 * Page URL column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_page_url( $item ) {
+		if ( empty( $item->page_url ) ) {
+			return '<span class="elbishion-muted">&mdash;</span>';
+		}
+
+		return sprintf(
+			'<a class="elbishion-url" href="%1$s" target="_blank" rel="noopener noreferrer">%2$s</a>',
+			esc_url( $item->page_url ),
+			esc_html( wp_trim_words( $item->page_url, 7, '...' ) )
+		);
+	}
+
+	/**
+	 * Date column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_created_at( $item ) {
+		return esc_html( mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $item->created_at ) );
+	}
+
+	/**
+	 * Row actions column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	private function column_actions( $item ) {
+		$view_url = add_query_arg(
+			array(
+				'page' => 'elbishion',
+				'view' => 'detail',
+				'id'   => absint( $item->id ),
+			),
+			admin_url( 'admin.php' )
+		);
+
+		$archive_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'             => 'elbishion',
+					'elbishion_action' => 'archive',
+					'id'               => absint( $item->id ),
+				),
+				admin_url( 'admin.php' )
+			),
+			'elbishion_submission_action_' . absint( $item->id )
+		);
+
+		return sprintf(
+			'<div class="elbishion-actions"><a class="button button-small" href="%1$s">%2$s</a><a class="button button-small elbishion-confirm-action" href="%3$s">%4$s</a></div>',
+			esc_url( $view_url ),
+			esc_html__( 'ნახვა', 'elbishion' ),
+			esc_url( $archive_url ),
+			esc_html__( 'არქივი', 'elbishion' )
+		);
+	}
+
+	/**
+	 * Extra filters.
+	 *
+	 * @param string $which Top or bottom nav.
+	 */
+	protected function extra_tablenav( $which ) {
+		if ( 'top' !== $which ) {
+			return;
+		}
+
+		$current_form = $this->request_value( 'form_name' );
+		$date_from    = $this->request_value( 'date_from' );
+		$date_to      = $this->request_value( 'date_to' );
+		$order        = isset( $_REQUEST['order'] ) && 'asc' === strtolower( sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) ) ? 'asc' : 'desc';
+		?>
+		<div class="alignleft actions elbishion-filters">
+			<select name="form_name" aria-label="<?php esc_attr_e( 'ფორმის სახელით გაფილტვრა', 'elbishion' ); ?>">
+				<option value=""><?php esc_html_e( 'ყველა ფორმა', 'elbishion' ); ?></option>
+				<?php foreach ( $this->form_names as $form_name ) : ?>
+					<option value="<?php echo esc_attr( $form_name ); ?>" <?php selected( $current_form, $form_name ); ?>><?php echo esc_html( $form_name ); ?></option>
+				<?php endforeach; ?>
+			</select>
+
+			<input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>" aria-label="<?php esc_attr_e( 'საწყისი თარიღი', 'elbishion' ); ?>">
+			<input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>" aria-label="<?php esc_attr_e( 'საბოლოო თარიღი', 'elbishion' ); ?>">
+
+			<select name="order" aria-label="<?php esc_attr_e( 'დალაგება', 'elbishion' ); ?>">
+				<option value="desc" <?php selected( $order, 'desc' ); ?>><?php esc_html_e( 'ჯერ ახალი', 'elbishion' ); ?></option>
+				<option value="asc" <?php selected( $order, 'asc' ); ?>><?php esc_html_e( 'ჯერ ძველი', 'elbishion' ); ?></option>
+			</select>
+
+			<?php submit_button( __( 'გაფილტვრა', 'elbishion' ), '', 'filter_action', false ); ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Empty state.
+	 */
+	public function no_items() {
+		?>
+		<div class="elbishion-empty-state">
+			<div class="elbishion-empty-icon">E</div>
+			<h2><?php esc_html_e( 'განაცხადები ვერ მოიძებნა', 'elbishion' ); ?></h2>
+			<p><?php esc_html_e( 'ახალი განაცხადები shortcode-დან, developer hook-იდან ან Elementor Pro Forms-იდან აქ გამოჩნდება.', 'elbishion' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Process bulk actions.
+	 */
+	public function process_bulk_action() {
+		$action = $this->current_action();
+
+		if ( empty( $action ) || 'export' === $action ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'ამ ქმედების შესრულების უფლება არ გაქვთ.', 'elbishion' ) );
+		}
+
+		check_admin_referer( 'bulk-submissions' );
+
+		$ids = isset( $_REQUEST['submissions'] ) && is_array( $_REQUEST['submissions'] )
+			? array_map( 'absint', wp_unslash( $_REQUEST['submissions'] ) )
+			: array();
+
+		if ( empty( $ids ) ) {
+			return;
+		}
+
+		switch ( $action ) {
+			case 'mark_read':
+				Elbishion_Database::update_status( $ids, 'read' );
+				$this->message = __( 'მონიშნული განაცხადები წაკითხულად მოინიშნა.', 'elbishion' );
+				break;
+			case 'mark_unread':
+				Elbishion_Database::update_status( $ids, 'unread' );
+				$this->message = __( 'მონიშნული განაცხადები წაუკითხავად მოინიშნა.', 'elbishion' );
+				break;
+			case 'star':
+				Elbishion_Database::update_status( $ids, 'starred' );
+				$this->message = __( 'მონიშნულ განაცხადებს ვარსკვლავი დაემატა.', 'elbishion' );
+				break;
+			case 'archive':
+				Elbishion_Database::update_status( $ids, 'archived' );
+				$this->message = __( 'მონიშნული განაცხადები დაარქივდა.', 'elbishion' );
+				break;
+			case 'delete':
+				Elbishion_Database::delete_submissions( $ids );
+				$this->message = __( 'მონიშნული განაცხადები წაიშალა.', 'elbishion' );
+				break;
+		}
+	}
+
+	/**
+	 * Find a likely value by key.
+	 *
+	 * @param array $data Submitted data.
+	 * @param array $keys Possible keys.
+	 * @return string
+	 */
+	private function find_value( $data, $keys ) {
+		$normalized = array();
+
+		foreach ( $data as $key => $value ) {
+			$normalized[ strtolower( trim( (string) $key ) ) ] = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : (string) $value;
+		}
+
+		foreach ( $keys as $key ) {
+			if ( isset( $normalized[ strtolower( $key ) ] ) && '' !== $normalized[ strtolower( $key ) ] ) {
+				return $normalized[ strtolower( $key ) ];
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Get request value.
+	 *
+	 * @param string $key Request key.
+	 * @return string
+	 */
+	private function request_value( $key ) {
+		return isset( $_REQUEST[ $key ] ) ? sanitize_text_field( wp_unslash( $_REQUEST[ $key ] ) ) : '';
+	}
+
+	/**
+	 * Build a readable preview from likely message fields.
+	 *
+	 * @param array $data Submitted data.
+	 * @return string
+	 */
+	private function find_message_preview( $data ) {
+		$known = $this->find_value(
+			$data,
+			array(
+				'message',
+				'your message',
+				'comments',
+				'comment',
+				'description',
+				'შეტყობინება',
+				'მესიჯი',
+				'კომენტარი',
+				'აღწერა',
+				'ტექსტი',
+			)
+		);
+
+		if ( $known ) {
+			return $known;
+		}
+
+		$skip_keys = array( 'name', 'full name', 'first name', 'სახელი', 'სახელი და გვარი', 'email', 'email address', 'ელფოსტა', 'ელ. ფოსტა', 'phone', 'phone_number', 'ტელეფონი', 'მობილური' );
+		$best      = '';
+
+		foreach ( $data as $key => $value ) {
+			$normalized_key = strtolower( trim( (string) $key ) );
+
+			if ( in_array( $normalized_key, $skip_keys, true ) ) {
+				continue;
+			}
+
+			$value = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : (string) $value;
+
+			if ( strlen( $value ) > strlen( $best ) ) {
+				$best = $value;
+			}
+		}
+
+		return $best ? $best : __( 'შეტყობინება არ არის', 'elbishion' );
+	}
+
+	/**
+	 * Georgian status labels.
+	 *
+	 * @param string $status Status key.
+	 * @return string
+	 */
+	private static function status_label( $status ) {
+		$labels = array(
+			'unread'   => __( 'წაუკითხავი', 'elbishion' ),
+			'read'     => __( 'წაკითხული', 'elbishion' ),
+			'starred'  => __( 'ვარსკვლავით მონიშნული', 'elbishion' ),
+			'archived' => __( 'დაარქივებული', 'elbishion' ),
+		);
+
+		return $labels[ $status ] ?? $status;
+	}
+}
