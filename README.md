@@ -6,9 +6,9 @@ Elbishion is a standalone WordPress form submissions manager. It stores submissi
 
 ## Version
 
-Current version: `2.0.1`
+Current version: `2.0.2`
 
-Recommended Git tag: `v2.0.1`
+Recommended Git tag: `v2.0.2`
 
 Author: Abe Prangishvili
 

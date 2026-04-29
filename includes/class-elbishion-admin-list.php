@@ -575,6 +575,10 @@ class Elbishion_Admin_List extends WP_List_Table {
 			return $known;
 		}
 
+		if ( ! empty( $data['fields'] ) && is_array( $data['fields'] ) ) {
+			return __( 'შეტყობინება არ არის', 'elbishion' );
+		}
+
 		$skip_keys = array( 'name', 'full name', 'first name', 'სახელი', 'სახელი და გვარი', 'email', 'email address', 'ელფოსტა', 'ელ. ფოსტა', 'phone', 'phone_number', 'ტელეფონი', 'მობილური' );
 		$best      = '';
 
