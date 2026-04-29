@@ -8,6 +8,8 @@ Current version: `1.0.0`
 
 Recommended Git tag: `v1.0.0`
 
+Author: Abe Prangishvili
+
 ## Features
 
 - WordPress admin menu for all submissions, unread submissions, starred submissions, archived submissions, and settings.
