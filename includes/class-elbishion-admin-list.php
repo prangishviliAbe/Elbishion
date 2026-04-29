@@ -69,7 +69,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 			'status'       => __( 'სტატუსი', 'elbishion' ),
 			'form_name'    => __( 'სახელი და გვარი', 'elbishion' ),
 			'contact'      => __( 'საკონტაქტო ინფორმაცია', 'elbishion' ),
-			'message'      => __( 'შეტყობინება', 'elbishion' ),
+			'message'      => __( 'კურსის დასახელება', 'elbishion' ),
 			'page_url'     => __( 'გვერდის ბმული', 'elbishion' ),
 			'created_at'   => __( 'თარიღი', 'elbishion' ),
 			'row_actions'  => __( 'ქმედებები', 'elbishion' ),
@@ -555,6 +555,12 @@ class Elbishion_Admin_List extends WP_List_Table {
 	 * @return string
 	 */
 	private function find_message_preview( $data ) {
+		$course_name = $this->find_course_name_preview( $data );
+
+		if ( '' !== $course_name ) {
+			return $course_name;
+		}
+
 		$known = $this->find_value(
 			$data,
 			array(
@@ -576,7 +582,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 		}
 
 		if ( ! empty( $data['fields'] ) && is_array( $data['fields'] ) ) {
-			return __( 'შეტყობინება არ არის', 'elbishion' );
+			return __( 'კურსის დასახელება არ არის', 'elbishion' );
 		}
 
 		$skip_keys = array( 'name', 'full name', 'first name', 'სახელი', 'სახელი და გვარი', 'email', 'email address', 'ელფოსტა', 'ელ. ფოსტა', 'phone', 'phone_number', 'ტელეფონი', 'მობილური' );
@@ -596,7 +602,151 @@ class Elbishion_Admin_List extends WP_List_Table {
 			}
 		}
 
-		return $best ? $best : __( 'შეტყობინება არ არის', 'elbishion' );
+		return $best ? $best : __( 'კურსის დასახელება არ არის', 'elbishion' );
+	}
+
+	/**
+	 * Find course name/title value from structured and legacy submissions.
+	 *
+	 * @param array $data Submitted data.
+	 * @return string
+	 */
+	private function find_course_name_preview( $data ) {
+		$course = $this->find_value(
+			$data,
+			array(
+				'course',
+				'course name',
+				'course_name',
+				'course title',
+				'course_title',
+				'კურსის დასახელება',
+				'კურსის სახელი',
+			)
+		);
+
+		if ( '' !== $course ) {
+			return $course;
+		}
+
+		if ( empty( $data['fields'] ) || ! is_array( $data['fields'] ) || ! $this->has_course_context( $data['fields'] ) ) {
+			return '';
+		}
+
+		foreach ( $data['fields'] as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$label = trim( (string) ( $field['field_label'] ?? ( $field['label'] ?? '' ) ) );
+			$id    = trim( (string) ( $field['field_id'] ?? ( $field['id'] ?? '' ) ) );
+			$value = $field['field_value'] ?? ( $field['value'] ?? '' );
+
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+
+			$value = trim( (string) $value );
+
+			if ( '' === $value || $this->is_contact_or_course_meta_field( $label, $id ) ) {
+				continue;
+			}
+
+			if ( $this->same_readable_label( $label, $value ) ) {
+				return $value;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Check whether sibling fields indicate a course submission.
+	 *
+	 * @param array $fields Normalized fields.
+	 * @return bool
+	 */
+	private function has_course_context( $fields ) {
+		foreach ( $fields as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$label = (string) ( $field['field_label'] ?? ( $field['label'] ?? '' ) );
+			$id    = (string) ( $field['field_id'] ?? ( $field['id'] ?? '' ) );
+
+			if ( $this->contains_text( $label, array( 'კურსის ფასი', 'ხანგრძლივობა', 'course price', 'duration' ) ) || $this->contains_text( $id, array( 'course_price', 'course-price', 'duration' ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Avoid using contact and course metadata fields as course titles.
+	 *
+	 * @param string $label Field label.
+	 * @param string $id Field ID.
+	 * @return bool
+	 */
+	private function is_contact_or_course_meta_field( $label, $id ) {
+		$needles = array(
+			'name',
+			'full name',
+			'first name',
+			'email',
+			'phone',
+			'phone_number',
+			'course price',
+			'duration',
+			'სახელი',
+			'სახელი და გვარი',
+			'ელფოსტა',
+			'ტელეფონი',
+			'ტელეფონის ნომერი',
+			'კურსის ფასი',
+			'ხანგრძლივობა',
+		);
+
+		return $this->contains_text( $label, $needles ) || $this->contains_text( $id, $needles );
+	}
+
+	/**
+	 * Case-insensitive contains helper for ASCII while keeping Georgian text intact.
+	 *
+	 * @param string $value Haystack.
+	 * @param array  $needles Needles.
+	 * @return bool
+	 */
+	private function contains_text( $value, $needles ) {
+		$value       = (string) $value;
+		$value_lower = strtolower( $value );
+
+		foreach ( $needles as $needle ) {
+			$needle       = (string) $needle;
+			$needle_lower = strtolower( $needle );
+
+			if ( false !== strpos( $value_lower, $needle_lower ) || false !== strpos( $value, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Compare readable versions of two field labels.
+	 *
+	 * @param string $left First label.
+	 * @param string $right Second label.
+	 * @return bool
+	 */
+	private function same_readable_label( $left, $right ) {
+		$left  = strtolower( trim( str_replace( array( '_', '-' ), ' ', (string) $left ) ) );
+		$right = strtolower( trim( str_replace( array( '_', '-' ), ' ', (string) $right ) ) );
+
+		return '' !== $left && $left === $right;
 	}
 
 	/**
