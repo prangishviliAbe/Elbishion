@@ -19,9 +19,19 @@ class Elbishion_Admin_Menu {
 	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
+		add_action( 'admin_menu', array( __CLASS__, 'register_extra_menu' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_single_action' ) );
 		add_filter( 'gettext', array( __CLASS__, 'translate_core_table_text' ), 10, 3 );
+	}
+
+	/**
+	 * Register universal inbox subpages.
+	 */
+	public static function register_extra_menu() {
+		add_submenu_page( 'elbishion', __( 'Forms', 'elbishion' ), __( 'Forms', 'elbishion' ), 'manage_options', 'elbishion-forms', array( __CLASS__, 'render_forms_page' ) );
+		add_submenu_page( 'elbishion', __( 'Integrations', 'elbishion' ), __( 'Integrations', 'elbishion' ), 'manage_options', 'elbishion-integrations', array( __CLASS__, 'render_integrations_page' ) );
+		add_submenu_page( 'elbishion', __( 'Tools', 'elbishion' ), __( 'Tools', 'elbishion' ), 'manage_options', 'elbishion-tools', array( __CLASS__, 'render_tools_page' ) );
 	}
 
 	/**
@@ -63,6 +73,145 @@ class Elbishion_Admin_Menu {
 
 		wp_enqueue_style( 'elbishion-admin', ELBISHION_PLUGIN_URL . 'assets/css/admin.css', array(), ELBISHION_VERSION );
 		wp_enqueue_script( 'elbishion-admin', ELBISHION_PLUGIN_URL . 'assets/js/admin.js', array(), ELBISHION_VERSION, true );
+	}
+
+	/**
+	 * Render grouped forms overview.
+	 */
+	public static function render_forms_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'elbishion' ) );
+		}
+
+		$forms = Elbishion_Database::get_forms_overview();
+		?>
+		<div class="wrap elbishion-admin">
+			<div class="elbishion-page-header">
+				<div>
+					<h1><?php esc_html_e( 'Forms', 'elbishion' ); ?></h1>
+					<p><?php esc_html_e( 'Submission totals grouped by source plugin and form name.', 'elbishion' ); ?></p>
+				</div>
+			</div>
+			<div class="elbishion-list-form">
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Form Name', 'elbishion' ); ?></th>
+							<th><?php esc_html_e( 'Source Plugin', 'elbishion' ); ?></th>
+							<th><?php esc_html_e( 'Total', 'elbishion' ); ?></th>
+							<th><?php esc_html_e( 'Unread', 'elbishion' ); ?></th>
+							<th><?php esc_html_e( 'Last Submission', 'elbishion' ); ?></th>
+							<th><?php esc_html_e( 'Actions', 'elbishion' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php if ( empty( $forms ) ) : ?>
+							<tr><td colspan="6"><?php esc_html_e( 'No forms captured yet.', 'elbishion' ); ?></td></tr>
+						<?php endif; ?>
+						<?php foreach ( $forms as $form ) : ?>
+							<?php
+							$url = add_query_arg(
+								array(
+									'page'   => 'elbishion',
+									'source' => $form->source_plugin,
+									'form_name' => $form->form_name,
+								),
+								admin_url( 'admin.php' )
+							);
+							?>
+							<tr>
+								<td><?php echo esc_html( $form->form_name ); ?></td>
+								<td><?php echo esc_html( self::source_label( $form->source_plugin ) ); ?></td>
+								<td><?php echo esc_html( absint( $form->total_submissions ) ); ?></td>
+								<td><?php echo esc_html( absint( $form->unread_submissions ) ); ?></td>
+								<td><?php echo esc_html( $form->last_submission_at ); ?></td>
+								<td><a class="button button-small" href="<?php echo esc_url( $url ); ?>"><?php esc_html_e( 'View submissions', 'elbishion' ); ?></a></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render integrations settings page.
+	 */
+	public static function render_integrations_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'elbishion' ) );
+		}
+
+		$settings     = Elbishion_Settings::get_settings();
+		$integrations = Elbishion_Integrations_Manager::integrations();
+		?>
+		<div class="wrap elbishion-admin">
+			<div class="elbishion-page-header">
+				<div>
+					<h1><?php esc_html_e( 'Integrations', 'elbishion' ); ?></h1>
+					<p><?php esc_html_e( 'Enable automatic capture for installed form systems and tune per-form rules.', 'elbishion' ); ?></p>
+				</div>
+			</div>
+			<form method="post" action="options.php" class="elbishion-card elbishion-settings-card">
+				<?php settings_fields( 'elbishion_settings_group' ); ?>
+				<?php foreach ( $settings as $key => $value ) : ?>
+					<?php if ( 'integrations' === $key || is_array( $value ) ) : ?>
+						<?php continue; ?>
+					<?php endif; ?>
+					<input type="hidden" name="elbishion_settings[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $value ); ?>">
+				<?php endforeach; ?>
+				<?php foreach ( $integrations as $slug => $integration ) : ?>
+					<?php $row = Elbishion_Settings::get_integration_settings( $slug ); ?>
+					<div class="elbishion-integration-row">
+						<div>
+							<h2><?php echo esc_html( $integration['label'] ); ?></h2>
+							<p>
+								<?php echo Elbishion_Integrations_Manager::is_detected( $slug ) ? esc_html__( 'Active', 'elbishion' ) : esc_html__( 'Not Active', 'elbishion' ); ?>
+							</p>
+						</div>
+						<label><input type="checkbox" name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][enabled]" value="1" <?php checked( $row['enabled'], 1 ); ?>> <?php esc_html_e( 'Enabled', 'elbishion' ); ?></label>
+						<label><input type="checkbox" name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][capture_all]" value="1" <?php checked( $row['capture_all'], 1 ); ?>> <?php esc_html_e( 'Capture all forms', 'elbishion' ); ?></label>
+						<label><input type="checkbox" name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][save_ip]" value="1" <?php checked( $row['save_ip'], 1 ); ?>> <?php esc_html_e( 'Save IP', 'elbishion' ); ?></label>
+						<label><input type="checkbox" name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][save_user_agent]" value="1" <?php checked( $row['save_user_agent'], 1 ); ?>> <?php esc_html_e( 'Save user agent', 'elbishion' ); ?></label>
+						<?php if ( 'woocommerce' === $slug ) : ?>
+							<label><input type="checkbox" name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][capture_checkout]" value="1" <?php checked( $row['capture_checkout'], 1 ); ?>> <?php esc_html_e( 'Capture checkout fields', 'elbishion' ); ?></label>
+						<?php endif; ?>
+						<label><?php esc_html_e( 'Selected forms', 'elbishion' ); ?><textarea name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][selected_forms]" rows="2"><?php echo esc_textarea( $row['selected_forms'] ); ?></textarea></label>
+						<label><?php esc_html_e( 'Ignored forms', 'elbishion' ); ?><textarea name="elbishion_settings[integrations][<?php echo esc_attr( $slug ); ?>][ignore_forms]" rows="2"><?php echo esc_textarea( $row['ignore_forms'] ); ?></textarea></label>
+					</div>
+				<?php endforeach; ?>
+				<?php submit_button( __( 'Save Integrations', 'elbishion' ), 'primary elbishion-primary-button' ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render tools page.
+	 */
+	public static function render_tools_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'elbishion' ) );
+		}
+
+		?>
+		<div class="wrap elbishion-admin">
+			<div class="elbishion-page-header">
+				<div>
+					<h1><?php esc_html_e( 'Tools', 'elbishion' ); ?></h1>
+					<p><?php esc_html_e( 'Universal capture helpers for developers.', 'elbishion' ); ?></p>
+				</div>
+			</div>
+			<div class="elbishion-card elbishion-settings-card">
+				<h2><?php esc_html_e( 'Custom HTML capture', 'elbishion' ); ?></h2>
+				<pre>&lt;input type="hidden" name="elbishion_capture" value="1"&gt;
+&lt;input type="hidden" name="elbishion_form_name" value="Contact Form"&gt;</pre>
+				<h2><?php esc_html_e( 'Developer action', 'elbishion' ); ?></h2>
+				<pre>do_action( 'elbishion_save_submission', $form_name, $submitted_data, $source, $meta );</pre>
+			</div>
+		</div>
+		<?php
 	}
 
 	/**
@@ -184,8 +333,8 @@ class Elbishion_Admin_Menu {
 						<dd>#<?php echo esc_html( $submission->id ); ?></dd>
 						<dt><?php esc_html_e( 'ფორმის სახელი', 'elbishion' ); ?></dt>
 						<dd><?php echo esc_html( $submission->form_name ); ?></dd>
-						<dt><?php esc_html_e( 'Source', 'elbishion' ); ?></dt>
-						<dd><?php echo esc_html( self::source_label( isset( $submission->source ) ? $submission->source : 'api' ) ); ?></dd>
+						<dt><?php esc_html_e( 'Source Plugin', 'elbishion' ); ?></dt>
+						<dd><?php echo esc_html( self::source_label( isset( $submission->source_plugin ) && $submission->source_plugin ? $submission->source_plugin : ( $submission->source ?? 'api' ) ) ); ?></dd>
 						<dt><?php esc_html_e( 'გვერდის ბმული', 'elbishion' ); ?></dt>
 						<dd>
 							<?php if ( $submission->page_url ) : ?>
@@ -268,7 +417,7 @@ class Elbishion_Admin_Menu {
 			'elbishion_export'  => $type,
 		);
 
-		foreach ( array( 'status', 'source', 's', 'form_name', 'date_from', 'date_to', 'order' ) as $key ) {
+		foreach ( array( 'status', 'source', 's', 'form_name', 'date_from', 'date_to', 'order', 'has_attachments', 'user_scope', 'user_id', 'page_url' ) as $key ) {
 			if ( isset( $_GET[ $key ] ) && '' !== $_GET[ $key ] ) {
 				$args[ $key ] = sanitize_text_field( wp_unslash( $_GET[ $key ] ) );
 			}
@@ -374,12 +523,14 @@ class Elbishion_Admin_Menu {
 				continue;
 			}
 
-			$label = ! empty( $field['label'] ) ? $field['label'] : ( $field['id'] ?? __( 'Field', 'elbishion' ) );
-			$value = $field['value'] ?? '';
+			$label = ! empty( $field['field_label'] ) ? $field['field_label'] : ( $field['label'] ?? ( $field['field_id'] ?? ( $field['id'] ?? __( 'Field', 'elbishion' ) ) ) );
+			$value = $field['field_value'] ?? ( $field['value'] ?? '' );
 			$key   = $label;
 
-			if ( ! empty( $field['id'] ) && strtolower( (string) $field['id'] ) !== strtolower( (string) $label ) ) {
-				$key = sprintf( '%1$s (%2$s)', $label, $field['id'] );
+			$field_id = $field['field_id'] ?? ( $field['id'] ?? '' );
+
+			if ( ! empty( $field_id ) && strtolower( (string) $field_id ) !== strtolower( (string) $label ) ) {
+				$key = sprintf( '%1$s (%2$s)', $label, $field_id );
 			}
 
 			$display[ $key ] = $value;
@@ -564,9 +715,20 @@ class Elbishion_Admin_Menu {
 	 */
 	private static function source_label( $source ) {
 		$labels = array(
-			'shortcode' => __( 'Shortcode', 'elbishion' ),
-			'elementor' => __( 'Elementor', 'elbishion' ),
-			'api'       => __( 'API', 'elbishion' ),
+			'shortcode'        => __( 'Shortcode', 'elbishion' ),
+			'elementor'        => __( 'Elementor', 'elbishion' ),
+			'contact_form_7'   => __( 'Contact Form 7', 'elbishion' ),
+			'wpforms'          => __( 'WPForms', 'elbishion' ),
+			'gravity_forms'    => __( 'Gravity Forms', 'elbishion' ),
+			'fluent_forms'     => __( 'Fluent Forms', 'elbishion' ),
+			'ninja_forms'      => __( 'Ninja Forms', 'elbishion' ),
+			'formidable_forms' => __( 'Formidable Forms', 'elbishion' ),
+			'jetformbuilder'   => __( 'JetFormBuilder', 'elbishion' ),
+			'forminator'       => __( 'Forminator', 'elbishion' ),
+			'woocommerce'      => __( 'WooCommerce', 'elbishion' ),
+			'wordpress_native' => __( 'WordPress Native', 'elbishion' ),
+			'custom_html'      => __( 'Custom HTML', 'elbishion' ),
+			'api'              => __( 'API', 'elbishion' ),
 		);
 
 		return $labels[ $source ] ?? __( 'API', 'elbishion' );

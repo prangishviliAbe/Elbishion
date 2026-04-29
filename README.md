@@ -6,9 +6,9 @@ Elbishion is a standalone WordPress form submissions manager. It stores submissi
 
 ## Version
 
-Current version: `1.1.0`
+Current version: `2.0.0`
 
-Recommended Git tag: `v1.1.0`
+Recommended Git tag: `v2.0.0`
 
 Author: Abe Prangishvili
 
@@ -17,8 +17,9 @@ Author: Abe Prangishvili
 - WordPress admin menu for all submissions, unread submissions, starred submissions, archived submissions, and settings.
 - Built-in frontend shortcode form.
 - Developer function and action hook for saving custom form submissions.
-- Optional Elementor Pro Forms capture through `elementor_pro/forms/new_record`, including form name, page URL, field labels, field IDs, and values.
-- Source tracking for Shortcode, Elementor, and API submissions.
+- Universal capture layer with normalized storage for multiple WordPress form systems.
+- Automatic integrations for Elementor Pro Forms, Contact Form 7, WPForms, Gravity Forms, Fluent Forms, Ninja Forms, Formidable Forms, JetFormBuilder, Forminator, WooCommerce, WordPress native forms, Custom HTML forms, and API submissions.
+- Source plugin tracking, source form IDs, source form names, user metadata, duplicate hashes, attachment metadata, raw data storage, and privacy controls.
 - Submission detail view with field cards, message display, metadata, page URL, IP address, and user-agent where enabled.
 - Search, form-name filtering, date filtering, ordering, pagination, and status filters.
 - Bulk actions for marking read/unread, starring, archiving, exporting, and deleting submissions.
@@ -124,6 +125,45 @@ do_action( 'elbishion_submission_saved', $submission_id, $form_name, $submitted_
 
 This is useful for analytics, CRM syncing, custom notifications, or external automation.
 
+The developer action API also accepts source and metadata:
+
+```php
+do_action( 'elbishion_save_submission', $form_name, $submitted_data, $source, $meta );
+```
+
+Developer helpers:
+
+```php
+elbishion_save_submission( $form_name, $submitted_data, $args );
+elbishion_get_submissions( $args );
+elbishion_get_submission( $id );
+elbishion_update_submission_status( $id, $status );
+```
+
+## Elementor Pro Forms
+
+## Universal Integrations
+
+Elbishion detects supported form plugins and registers lightweight capture hooks automatically when the integration is enabled.
+
+Supported integrations:
+
+- Elementor Pro Forms
+- Contact Form 7
+- WPForms Lite and Pro
+- Gravity Forms
+- Fluent Forms
+- Ninja Forms
+- Formidable Forms
+- JetFormBuilder
+- Forminator
+- WooCommerce registration and optional checkout capture
+- WordPress native registration, comments, login, and password reset
+- Custom HTML forms
+- Developer API submissions
+
+Each integration can be enabled or disabled from **Elbishion > Integrations**. Integrations support capture-all mode, selected form allowlists, ignored form lists, per-integration IP/user-agent toggles, and notification toggles.
+
 ## Elementor Pro Forms
 
 If Elementor Pro is active, Elbishion listens to:
@@ -143,6 +183,17 @@ Settings:
 - **Elementor form name allowlist** accepts one form name per line or comma-separated form names.
 
 If Elementor Pro is not active, Elbishion continues working normally with shortcode and API submissions.
+
+## Custom HTML Forms
+
+Enable custom HTML capture from **Elbishion > Integrations**, then include these hidden fields in any custom form:
+
+```html
+<input type="hidden" name="elbishion_capture" value="1">
+<input type="hidden" name="elbishion_form_name" value="Contact Form">
+```
+
+Elbishion captures the submitted fields without preventing the original form handler from running.
 
 ## Admin Workflow
 
@@ -183,6 +234,12 @@ The settings page controls:
 - Elementor Forms capture enablement
 - selected-only Elementor capture
 - Elementor form name allowlist
+- duplicate prevention and duplicate time window
+- IP masking
+- automatic retention cleanup
+- raw data storage
+- hidden field exclusion
+- sensitive keyword exclusion
 
 Pagination is constrained between 5 and 100 items per page.
 
@@ -196,7 +253,13 @@ Submissions are stored in a custom database table with these core fields:
 - `user_ip`
 - `user_agent`
 - `source`
+- `source_plugin`
+- `source_form_id`
+- `source_form_name`
 - `submitted_data`
+- `raw_data`
+- `submission_hash`
+- `has_attachments`
 - `status`
 - `created_at`
 - `updated_at`
@@ -207,6 +270,17 @@ Source values:
 
 - `shortcode`
 - `elementor`
+- `contact_form_7`
+- `wpforms`
+- `gravity_forms`
+- `fluent_forms`
+- `ninja_forms`
+- `formidable_forms`
+- `jetformbuilder`
+- `forminator`
+- `woocommerce`
+- `wordpress_native`
+- `custom_html`
 - `api`
 
 Supported statuses:
@@ -240,6 +314,12 @@ Elbishion is designed around WordPress security primitives:
 - prepared database operations for dynamic values
 - safe redirects after frontend submission
 - optional IP and user-agent storage controls
+- optional IP masking
+- duplicate submission prevention
+- password, credit card, CVV, token, secret, and API key exclusion
+- optional hidden field exclusion
+- optional raw data storage
+- optional retention cleanup
 - optional cleanup during uninstall
 
 Because form submissions may contain personal data, site owners should align usage with their privacy policy, retention policy, and local compliance requirements.
@@ -295,7 +375,7 @@ Before publishing a new version:
 6. Test shortcode submission.
 7. Test admin status actions.
 8. Test CSV export.
-9. Create a version tag, for example `v1.1.0`.
+9. Create a version tag, for example `v2.0.0`.
 
 ## License
 

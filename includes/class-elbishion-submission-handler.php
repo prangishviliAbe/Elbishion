@@ -21,7 +21,6 @@ class Elbishion_Submission_Handler {
 		add_shortcode( 'elbishion_form', array( __CLASS__, 'render_shortcode_form' ) );
 		add_action( 'init', array( __CLASS__, 'maybe_handle_shortcode_submission' ) );
 		add_action( 'elbishion_submission_saved', array( __CLASS__, 'maybe_send_notification' ), 10, 4 );
-		add_action( 'elementor_pro/forms/new_record', array( __CLASS__, 'capture_elementor_submission_v2' ), 10, 2 );
 	}
 
 	/**
@@ -372,8 +371,14 @@ class Elbishion_Submission_Handler {
 	 */
 	public static function maybe_send_notification( $submission_id, $form_name, $submitted_data, $args ) {
 		$settings = Elbishion_Settings::get_settings();
+		$source_plugin = isset( $args['source_plugin'] ) ? sanitize_key( $args['source_plugin'] ) : ( isset( $args['source'] ) ? sanitize_key( $args['source'] ) : 'api' );
+		$integration_settings = Elbishion_Settings::get_integration_settings( $source_plugin );
 
-		if ( empty( $settings['email_notifications'] ) || empty( $settings['notification_email'] ) || ! is_email( $settings['notification_email'] ) ) {
+		if ( empty( $settings['email_notifications'] ) && empty( $integration_settings['email_notifications'] ) ) {
+			return;
+		}
+
+		if ( empty( $settings['notification_email'] ) || ! is_email( $settings['notification_email'] ) ) {
 			return;
 		}
 
@@ -396,7 +401,14 @@ class Elbishion_Submission_Handler {
 		$lines[] = '';
 		$lines[] = __( 'შევსებული ველები:', 'elbishion' );
 
-		foreach ( $submitted_data as $key => $value ) {
+		$fields = isset( $submitted_data['fields'] ) && is_array( $submitted_data['fields'] ) ? $submitted_data['fields'] : $submitted_data;
+
+		foreach ( $fields as $key => $value ) {
+			if ( is_array( $value ) && isset( $value['field_label'] ) ) {
+				$key   = $value['field_label'];
+				$value = $value['field_value'] ?? '';
+			}
+
 			if ( is_array( $value ) ) {
 				$value = wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 			}

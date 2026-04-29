@@ -65,7 +65,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 	public function get_columns() {
 		return array(
 			'cb'           => '<input type="checkbox">',
-			'source'       => __( 'Source', 'elbishion' ),
+			'source'       => __( 'Source Plugin', 'elbishion' ),
 			'status'       => __( 'სტატუსი', 'elbishion' ),
 			'form_name'    => __( 'სახელი და გვარი', 'elbishion' ),
 			'contact'      => __( 'საკონტაქტო ინფორმაცია', 'elbishion' ),
@@ -118,6 +118,9 @@ class Elbishion_Admin_List extends WP_List_Table {
 			'source'    => $this->request_value( 'source' ),
 			'search'    => $this->request_value( 's' ),
 			'form_name' => $this->request_value( 'form_name' ),
+			'has_attachments' => $this->request_value( 'has_attachments' ),
+			'user_scope' => $this->request_value( 'user_scope' ),
+			'page_url' => $this->request_value( 'page_url' ),
 			'date_from' => $this->request_value( 'date_from' ),
 			'date_to'   => $this->request_value( 'date_to' ),
 			'order'     => $order,
@@ -224,7 +227,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 	 * @return string
 	 */
 	public function column_source( $item ) {
-		$source = isset( $item->source ) ? $item->source : 'api';
+		$source = isset( $item->source_plugin ) && $item->source_plugin ? $item->source_plugin : ( $item->source ?? 'api' );
 
 		return sprintf(
 			'<span class="elbishion-source-badge elbishion-source-%1$s">%2$s</span>',
@@ -386,9 +389,9 @@ class Elbishion_Admin_List extends WP_List_Table {
 		<div class="alignleft actions elbishion-filters">
 			<select name="source" aria-label="<?php esc_attr_e( 'Filter by source', 'elbishion' ); ?>">
 				<option value=""><?php esc_html_e( 'All sources', 'elbishion' ); ?></option>
-				<option value="shortcode" <?php selected( $current_source, 'shortcode' ); ?>><?php esc_html_e( 'Shortcode', 'elbishion' ); ?></option>
-				<option value="elementor" <?php selected( $current_source, 'elementor' ); ?>><?php esc_html_e( 'Elementor', 'elbishion' ); ?></option>
-				<option value="api" <?php selected( $current_source, 'api' ); ?>><?php esc_html_e( 'API', 'elbishion' ); ?></option>
+				<?php foreach ( self::source_labels() as $source => $label ) : ?>
+					<option value="<?php echo esc_attr( $source ); ?>" <?php selected( $current_source, $source ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
 			</select>
 
 			<select name="form_name" aria-label="<?php esc_attr_e( 'ფორმის სახელით გაფილტვრა', 'elbishion' ); ?>">
@@ -520,14 +523,14 @@ class Elbishion_Admin_List extends WP_List_Table {
 				continue;
 			}
 
-			$field_id = strtolower( trim( (string) ( $field['id'] ?? '' ) ) );
-			$label    = strtolower( trim( (string) ( $field['label'] ?? '' ) ) );
+			$field_id = strtolower( trim( (string) ( $field['field_id'] ?? ( $field['id'] ?? '' ) ) ) );
+			$label    = strtolower( trim( (string) ( $field['field_label'] ?? ( $field['label'] ?? '' ) ) ) );
 
 			if ( ! in_array( $field_id, $normalized_keys, true ) && ! in_array( $label, $normalized_keys, true ) ) {
 				continue;
 			}
 
-			$value = $field['value'] ?? '';
+			$value = $field['field_value'] ?? ( $field['value'] ?? '' );
 
 			return is_array( $value ) ? (string) wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : (string) $value;
 		}
@@ -598,12 +601,27 @@ class Elbishion_Admin_List extends WP_List_Table {
 	 * @param string $status Status key.
 	 * @return string
 	 */
-	private static function source_label( $source ) {
-		$labels = array(
-			'shortcode' => __( 'Shortcode', 'elbishion' ),
-			'elementor' => __( 'Elementor', 'elbishion' ),
-			'api'       => __( 'API', 'elbishion' ),
+	private static function source_labels() {
+		return array(
+			'shortcode'        => __( 'Shortcode', 'elbishion' ),
+			'elementor'        => __( 'Elementor', 'elbishion' ),
+			'contact_form_7'   => __( 'Contact Form 7', 'elbishion' ),
+			'wpforms'          => __( 'WPForms', 'elbishion' ),
+			'gravity_forms'    => __( 'Gravity Forms', 'elbishion' ),
+			'fluent_forms'     => __( 'Fluent Forms', 'elbishion' ),
+			'ninja_forms'      => __( 'Ninja Forms', 'elbishion' ),
+			'formidable_forms' => __( 'Formidable Forms', 'elbishion' ),
+			'jetformbuilder'   => __( 'JetFormBuilder', 'elbishion' ),
+			'forminator'       => __( 'Forminator', 'elbishion' ),
+			'woocommerce'      => __( 'WooCommerce', 'elbishion' ),
+			'wordpress_native' => __( 'WordPress Native', 'elbishion' ),
+			'custom_html'      => __( 'Custom HTML', 'elbishion' ),
+			'api'              => __( 'API', 'elbishion' ),
 		);
+	}
+
+	private static function source_label( $source ) {
+		$labels = self::source_labels();
 
 		return $labels[ $source ] ?? __( 'API', 'elbishion' );
 	}
