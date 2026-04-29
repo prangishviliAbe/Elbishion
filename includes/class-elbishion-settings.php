@@ -44,6 +44,7 @@ class Elbishion_Settings {
 	 */
 	public static function get_defaults() {
 		return array(
+			'interface_language'   => 'ka',
 			'save_ip'              => 1,
 			'save_user_agent'      => 1,
 			'delete_on_uninstall'  => 0,
@@ -150,6 +151,7 @@ class Elbishion_Settings {
 		}
 
 		return array(
+			'interface_language'   => isset( $input['interface_language'] ) && 'en' === sanitize_key( $input['interface_language'] ) ? 'en' : 'ka',
 			'save_ip'              => empty( $input['save_ip'] ) ? 0 : 1,
 			'save_user_agent'      => empty( $input['save_user_agent'] ) ? 0 : 1,
 			'delete_on_uninstall'  => empty( $input['delete_on_uninstall'] ) ? 0 : 1,
@@ -233,6 +235,17 @@ class Elbishion_Settings {
 
 			<form method="post" action="options.php" class="elbishion-card elbishion-settings-card">
 				<?php settings_fields( 'elbishion_settings_group' ); ?>
+
+				<div class="elbishion-setting-row">
+					<div>
+						<label for="elbishion-interface-language"><?php esc_html_e( 'Interface language', 'elbishion' ); ?></label>
+						<p><?php esc_html_e( 'Choose the language used inside Elbishion admin pages.', 'elbishion' ); ?></p>
+					</div>
+					<select id="elbishion-interface-language" name="elbishion_settings[interface_language]">
+						<option value="ka" <?php selected( $settings['interface_language'], 'ka' ); ?>><?php esc_html_e( 'Georgian', 'elbishion' ); ?></option>
+						<option value="en" <?php selected( $settings['interface_language'], 'en' ); ?>><?php esc_html_e( 'English', 'elbishion' ); ?></option>
+					</select>
+				</div>
 
 				<div class="elbishion-setting-row">
 					<div>

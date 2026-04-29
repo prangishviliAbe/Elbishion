@@ -22,7 +22,6 @@ class Elbishion_Admin_Menu {
 		add_action( 'admin_menu', array( __CLASS__, 'register_extra_menu' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_single_action' ) );
-		add_filter( 'gettext', array( __CLASS__, 'translate_core_table_text' ), 10, 3 );
 	}
 
 	/**

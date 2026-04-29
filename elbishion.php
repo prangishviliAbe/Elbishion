@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Elbishion
  * Description: Universal WordPress form submissions manager with a standalone inbox, integrations, CSV export, privacy controls, and developer APIs.
- * Version: 2.0.4
+ * Version: 2.0.5
  * Author: Abe Prangishvili
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ELBISHION_VERSION', '2.0.4' );
+define( 'ELBISHION_VERSION', '2.0.5' );
 define( 'ELBISHION_PLUGIN_FILE', __FILE__ );
 define( 'ELBISHION_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ELBISHION_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -26,6 +26,7 @@ require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-activator.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-database.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-migrations.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-privacy.php';
+require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-i18n.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-normalizer.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-integrations-manager.php';
 require_once ELBISHION_PLUGIN_DIR . 'includes/class-elbishion-submission-handler.php';
@@ -112,6 +113,7 @@ add_action( 'elbishion_save_submission', 'elbishion_handle_save_submission_actio
 function elbishion_bootstrap() {
 	load_plugin_textdomain( 'elbishion', false, dirname( ELBISHION_PLUGIN_BASENAME ) . '/languages' );
 
+	Elbishion_I18n::init();
 	Elbishion_Activator::maybe_upgrade();
 	Elbishion_Settings::init();
 	Elbishion_Integrations_Manager::init();
