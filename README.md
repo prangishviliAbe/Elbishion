@@ -276,4 +276,6 @@ Before publishing a new version:
 
 ## License
 
-No license file is included yet. Add a `LICENSE` file before distributing this plugin as open source or allowing third-party reuse.
+Elbishion is licensed under the GNU General Public License v2.0 or later.
+
+See [LICENSE](LICENSE) for the full license text.
