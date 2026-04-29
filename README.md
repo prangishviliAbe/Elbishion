@@ -6,9 +6,9 @@ Elbishion is a standalone WordPress form submissions manager. It stores submissi
 
 ## Version
 
-Current version: `1.0.0`
+Current version: `1.1.0`
 
-Recommended Git tag: `v1.0.0`
+Recommended Git tag: `v1.1.0`
 
 Author: Abe Prangishvili
 
@@ -17,7 +17,8 @@ Author: Abe Prangishvili
 - WordPress admin menu for all submissions, unread submissions, starred submissions, archived submissions, and settings.
 - Built-in frontend shortcode form.
 - Developer function and action hook for saving custom form submissions.
-- Optional Elementor Pro Forms capture through `elementor_pro/forms/new_record`.
+- Optional Elementor Pro Forms capture through `elementor_pro/forms/new_record`, including form name, page URL, field labels, field IDs, and values.
+- Source tracking for Shortcode, Elementor, and API submissions.
 - Submission detail view with field cards, message display, metadata, page URL, IP address, and user-agent where enabled.
 - Search, form-name filtering, date filtering, ordering, pagination, and status filters.
 - Bulk actions for marking read/unread, starring, archiving, exporting, and deleting submissions.
@@ -131,7 +132,17 @@ If Elementor Pro is active, Elbishion listens to:
 elementor_pro/forms/new_record
 ```
 
-The plugin reads the Elementor form name and submitted fields, then saves them into the Elbishion submissions table. No extra configuration is required.
+The plugin reads the Elementor form name, page URL, field labels, field IDs, and submitted values, then saves them into the Elbishion submissions table as clean JSON.
+
+Elementor capture is non-blocking. Elbishion does not stop Elementor's native emails, redirects, webhooks, or other form actions.
+
+Settings:
+
+- **Enable Elementor Forms Capture** captures all Elementor Pro form submissions when enabled.
+- **Capture only selected Elementor forms** limits capture to the allowlist.
+- **Elementor form name allowlist** accepts one form name per line or comma-separated form names.
+
+If Elementor Pro is not active, Elbishion continues working normally with shortcode and API submissions.
 
 ## Admin Workflow
 
@@ -169,6 +180,9 @@ The settings page controls:
 - admin pagination size
 - email notification enablement
 - notification recipient email
+- Elementor Forms capture enablement
+- selected-only Elementor capture
+- Elementor form name allowlist
 
 Pagination is constrained between 5 and 100 items per page.
 
@@ -181,12 +195,19 @@ Submissions are stored in a custom database table with these core fields:
 - `page_url`
 - `user_ip`
 - `user_agent`
+- `source`
 - `submitted_data`
 - `status`
 - `created_at`
 - `updated_at`
 
 Submission field data is stored as JSON in `submitted_data`.
+
+Source values:
+
+- `shortcode`
+- `elementor`
+- `api`
 
 Supported statuses:
 
@@ -274,7 +295,7 @@ Before publishing a new version:
 6. Test shortcode submission.
 7. Test admin status actions.
 8. Test CSV export.
-9. Create a version tag, for example `v1.0.0`.
+9. Create a version tag, for example `v1.1.0`.
 
 ## License
 

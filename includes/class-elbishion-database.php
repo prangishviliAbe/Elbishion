@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Elbishion_Database {
 
 	const ALLOWED_STATUSES = array( 'unread', 'read', 'starred', 'archived' );
+	const ALLOWED_SOURCES  = array( 'shortcode', 'elementor', 'api' );
 
 	/**
 	 * Submissions table name.
@@ -46,6 +47,8 @@ class Elbishion_Database {
 		$form_name = $form_name ? $form_name : __( 'უსახელო ფორმა', 'elbishion' );
 		$status    = isset( $args['status'] ) ? sanitize_key( $args['status'] ) : 'unread';
 		$status    = in_array( $status, self::ALLOWED_STATUSES, true ) ? $status : 'unread';
+		$source    = isset( $args['source'] ) ? sanitize_key( $args['source'] ) : 'api';
+		$source    = in_array( $source, self::ALLOWED_SOURCES, true ) ? $source : 'api';
 		$settings  = Elbishion_Settings::get_settings();
 		$now       = current_time( 'mysql' );
 
@@ -73,12 +76,13 @@ class Elbishion_Database {
 				'page_url'       => $page_url,
 				'user_ip'        => $user_ip,
 				'user_agent'     => $user_agent,
+				'source'         => $source,
 				'submitted_data' => $json,
 				'status'         => $status,
 				'created_at'     => $now,
 				'updated_at'     => $now,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $inserted ) {
@@ -199,10 +203,20 @@ class Elbishion_Database {
 	 *
 	 * @return array
 	 */
-	public static function get_form_names() {
+	public static function get_form_names( $source = '' ) {
 		global $wpdb;
 
 		$table = self::table_name();
+		$source = sanitize_key( $source );
+
+		if ( in_array( $source, self::ALLOWED_SOURCES, true ) ) {
+			return $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT form_name FROM {$table} WHERE form_name <> '' AND source = %s ORDER BY form_name ASC",
+					$source
+				)
+			);
+		}
 
 		return $wpdb->get_col( "SELECT DISTINCT form_name FROM {$table} WHERE form_name <> '' ORDER BY form_name ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
@@ -284,6 +298,7 @@ class Elbishion_Database {
 		$defaults = array(
 			'search'    => '',
 			'form_name' => '',
+			'source'    => '',
 			'status'    => '',
 			'date_from' => '',
 			'date_to'   => '',
@@ -327,9 +342,15 @@ class Elbishion_Database {
 			$values[] = sanitize_text_field( $args['form_name'] );
 		}
 
+		if ( ! empty( $args['source'] ) && in_array( $args['source'], self::ALLOWED_SOURCES, true ) ) {
+			$where[]  = 'source = %s';
+			$values[] = sanitize_key( $args['source'] );
+		}
+
 		if ( ! empty( $args['search'] ) ) {
 			$like     = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
-			$where[]  = '(form_name LIKE %s OR page_url LIKE %s OR submitted_data LIKE %s)';
+			$where[]  = '(form_name LIKE %s OR page_url LIKE %s OR source LIKE %s OR submitted_data LIKE %s)';
+			$values[] = $like;
 			$values[] = $like;
 			$values[] = $like;
 			$values[] = $like;

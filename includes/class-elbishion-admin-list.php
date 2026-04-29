@@ -65,6 +65,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 	public function get_columns() {
 		return array(
 			'cb'           => '<input type="checkbox">',
+			'source'       => __( 'Source', 'elbishion' ),
 			'status'       => __( 'სტატუსი', 'elbishion' ),
 			'form_name'    => __( 'სახელი და გვარი', 'elbishion' ),
 			'contact'      => __( 'საკონტაქტო ინფორმაცია', 'elbishion' ),
@@ -114,6 +115,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 		$order    = isset( $_REQUEST['order'] ) && 'asc' === strtolower( sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) ) ? 'ASC' : 'DESC';
 		$args     = array(
 			'status'    => $this->status ? $this->status : $this->request_value( 'status' ),
+			'source'    => $this->request_value( 'source' ),
 			'search'    => $this->request_value( 's' ),
 			'form_name' => $this->request_value( 'form_name' ),
 			'date_from' => $this->request_value( 'date_from' ),
@@ -126,6 +128,12 @@ class Elbishion_Admin_List extends WP_List_Table {
 		if ( ! in_array( $args['status'], Elbishion_Database::ALLOWED_STATUSES, true ) ) {
 			$args['status'] = '';
 		}
+
+		if ( ! in_array( $args['source'], Elbishion_Database::ALLOWED_SOURCES, true ) ) {
+			$args['source'] = '';
+		}
+
+		$this->form_names = Elbishion_Database::get_form_names( $args['source'] );
 
 		$total_items = Elbishion_Database::count_submissions( $args );
 		$this->items = Elbishion_Database::get_submissions( $args );
@@ -166,6 +174,8 @@ class Elbishion_Admin_List extends WP_List_Table {
 		switch ( $column_name ) {
 			case 'status':
 				return $this->column_status( $item );
+			case 'source':
+				return $this->column_source( $item );
 			case 'form_name':
 				return $this->column_form_name( $item );
 			case 'contact':
@@ -204,6 +214,22 @@ class Elbishion_Admin_List extends WP_List_Table {
 			'<span class="elbishion-status-dot elbishion-status-%1$s" title="%2$s"></span><span class="screen-reader-text">%2$s</span>',
 			esc_attr( $item->status ),
 			esc_attr( self::status_label( $item->status ) )
+		);
+	}
+
+	/**
+	 * Submission source column.
+	 *
+	 * @param object $item Row.
+	 * @return string
+	 */
+	public function column_source( $item ) {
+		$source = isset( $item->source ) ? $item->source : 'api';
+
+		return sprintf(
+			'<span class="elbishion-source-badge elbishion-source-%1$s">%2$s</span>',
+			esc_attr( $source ),
+			esc_html( self::source_label( $source ) )
 		);
 	}
 
@@ -351,12 +377,20 @@ class Elbishion_Admin_List extends WP_List_Table {
 			return;
 		}
 
-		$current_form = $this->request_value( 'form_name' );
+		$current_form   = $this->request_value( 'form_name' );
+		$current_source = $this->request_value( 'source' );
 		$date_from    = $this->request_value( 'date_from' );
 		$date_to      = $this->request_value( 'date_to' );
 		$order        = isset( $_REQUEST['order'] ) && 'asc' === strtolower( sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) ) ? 'asc' : 'desc';
 		?>
 		<div class="alignleft actions elbishion-filters">
+			<select name="source" aria-label="<?php esc_attr_e( 'Filter by source', 'elbishion' ); ?>">
+				<option value=""><?php esc_html_e( 'All sources', 'elbishion' ); ?></option>
+				<option value="shortcode" <?php selected( $current_source, 'shortcode' ); ?>><?php esc_html_e( 'Shortcode', 'elbishion' ); ?></option>
+				<option value="elementor" <?php selected( $current_source, 'elementor' ); ?>><?php esc_html_e( 'Elementor', 'elbishion' ); ?></option>
+				<option value="api" <?php selected( $current_source, 'api' ); ?>><?php esc_html_e( 'API', 'elbishion' ); ?></option>
+			</select>
+
 			<select name="form_name" aria-label="<?php esc_attr_e( 'ფორმის სახელით გაფილტვრა', 'elbishion' ); ?>">
 				<option value=""><?php esc_html_e( 'ყველა ფორმა', 'elbishion' ); ?></option>
 				<?php foreach ( $this->form_names as $form_name ) : ?>
@@ -446,6 +480,12 @@ class Elbishion_Admin_List extends WP_List_Table {
 	 * @return string
 	 */
 	private function find_value( $data, $keys ) {
+		$structured_value = $this->find_structured_field_value( $data, $keys );
+
+		if ( '' !== $structured_value ) {
+			return $structured_value;
+		}
+
 		$normalized = array();
 
 		foreach ( $data as $key => $value ) {
@@ -456,6 +496,40 @@ class Elbishion_Admin_List extends WP_List_Table {
 			if ( isset( $normalized[ strtolower( $key ) ] ) && '' !== $normalized[ strtolower( $key ) ] ) {
 				return $normalized[ strtolower( $key ) ];
 			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Find a value inside structured Elementor field JSON.
+	 *
+	 * @param array $data Submitted data.
+	 * @param array $keys Possible field IDs or labels.
+	 * @return string
+	 */
+	private function find_structured_field_value( $data, $keys ) {
+		if ( empty( $data['fields'] ) || ! is_array( $data['fields'] ) ) {
+			return '';
+		}
+
+		$normalized_keys = array_map( 'strtolower', array_map( 'trim', $keys ) );
+
+		foreach ( $data['fields'] as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$field_id = strtolower( trim( (string) ( $field['id'] ?? '' ) ) );
+			$label    = strtolower( trim( (string) ( $field['label'] ?? '' ) ) );
+
+			if ( ! in_array( $field_id, $normalized_keys, true ) && ! in_array( $label, $normalized_keys, true ) ) {
+				continue;
+			}
+
+			$value = $field['value'] ?? '';
+
+			return is_array( $value ) ? (string) wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : (string) $value;
 		}
 
 		return '';
@@ -524,6 +598,16 @@ class Elbishion_Admin_List extends WP_List_Table {
 	 * @param string $status Status key.
 	 * @return string
 	 */
+	private static function source_label( $source ) {
+		$labels = array(
+			'shortcode' => __( 'Shortcode', 'elbishion' ),
+			'elementor' => __( 'Elementor', 'elbishion' ),
+			'api'       => __( 'API', 'elbishion' ),
+		);
+
+		return $labels[ $source ] ?? __( 'API', 'elbishion' );
+	}
+
 	private static function status_label( $status ) {
 		$labels = array(
 			'unread'   => __( 'წაუკითხავი', 'elbishion' ),

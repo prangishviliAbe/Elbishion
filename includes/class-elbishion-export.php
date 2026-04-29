@@ -61,6 +61,7 @@ class Elbishion_Export {
 		$type = sanitize_key( wp_unslash( $_GET['elbishion_export'] ) );
 		$args = array(
 			'status'    => isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : '',
+			'source'    => isset( $_GET['source'] ) ? sanitize_key( wp_unslash( $_GET['source'] ) ) : '',
 			'search'    => isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '',
 			'form_name' => isset( $_GET['form_name'] ) ? sanitize_text_field( wp_unslash( $_GET['form_name'] ) ) : '',
 			'date_from' => isset( $_GET['date_from'] ) ? sanitize_text_field( wp_unslash( $_GET['date_from'] ) ) : '',
@@ -95,6 +96,7 @@ class Elbishion_Export {
 			$output,
 			array(
 				'ID',
+				'Source',
 				'ფორმის სახელი',
 				'შევსებული მონაცემები',
 				'გვერდის ბმული',
@@ -109,6 +111,7 @@ class Elbishion_Export {
 				$output,
 				array(
 					$row->id,
+					isset( $row->source ) ? $row->source : 'api',
 					$row->form_name,
 					$row->submitted_data,
 					$row->page_url,

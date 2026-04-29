@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Elbishion
  * Description: Standalone form submissions manager with shortcode, developer API, CSV export, and optional Elementor Pro Forms capture.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Abe Prangishvili
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ELBISHION_VERSION', '1.0.0' );
+define( 'ELBISHION_VERSION', '1.1.0' );
 define( 'ELBISHION_PLUGIN_FILE', __FILE__ );
 define( 'ELBISHION_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ELBISHION_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -64,6 +64,7 @@ add_action( 'elbishion_save_submission', 'elbishion_handle_save_submission_actio
 function elbishion_bootstrap() {
 	load_plugin_textdomain( 'elbishion', false, dirname( ELBISHION_PLUGIN_BASENAME ) . '/languages' );
 
+	Elbishion_Activator::maybe_upgrade();
 	Elbishion_Settings::init();
 	Elbishion_Submission_Handler::init();
 

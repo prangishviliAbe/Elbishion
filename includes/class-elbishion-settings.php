@@ -34,6 +34,9 @@ class Elbishion_Settings {
 			'items_per_page'       => 20,
 			'email_notifications'  => 0,
 			'notification_email'   => get_option( 'admin_email' ),
+			'elementor_capture'    => 1,
+			'elementor_selected'   => 0,
+			'elementor_allowlist'  => '',
 		);
 	}
 
@@ -89,7 +92,24 @@ class Elbishion_Settings {
 			'items_per_page'       => min( 100, max( 5, absint( $input['items_per_page'] ?? $defaults['items_per_page'] ) ) ),
 			'email_notifications'  => empty( $input['email_notifications'] ) ? 0 : 1,
 			'notification_email'   => $email,
+			'elementor_capture'    => empty( $input['elementor_capture'] ) ? 0 : 1,
+			'elementor_selected'   => empty( $input['elementor_selected'] ) ? 0 : 1,
+			'elementor_allowlist'  => isset( $input['elementor_allowlist'] ) ? self::sanitize_allowlist( $input['elementor_allowlist'] ) : '',
 		);
+	}
+
+	/**
+	 * Normalize a comma/newline separated form name allowlist.
+	 *
+	 * @param string $allowlist Raw allowlist.
+	 * @return string
+	 */
+	private static function sanitize_allowlist( $allowlist ) {
+		$allowlist = sanitize_textarea_field( wp_unslash( $allowlist ) );
+		$items     = preg_split( '/[\r\n,]+/', $allowlist );
+		$items     = array_filter( array_map( 'trim', (array) $items ) );
+
+		return implode( "\n", array_unique( $items ) );
 	}
 
 	/**
@@ -151,6 +171,30 @@ class Elbishion_Settings {
 						<p><?php esc_html_e( 'ახალი განაცხადის შენახვისას გაიგზავნება ელფოსტის შეტყობინება.', 'elbishion' ); ?></p>
 					</div>
 					<input id="elbishion-email-notifications" type="checkbox" name="elbishion_settings[email_notifications]" value="1" <?php checked( $settings['email_notifications'], 1 ); ?>>
+				</div>
+
+				<div class="elbishion-setting-row">
+					<div>
+						<label for="elbishion-elementor-capture"><?php esc_html_e( 'Enable Elementor Forms Capture', 'elbishion' ); ?></label>
+						<p><?php esc_html_e( 'Automatically save Elementor Pro form submissions into Elbishion without changing Elementor emails, redirects, webhooks, or other actions.', 'elbishion' ); ?></p>
+					</div>
+					<input id="elbishion-elementor-capture" type="checkbox" name="elbishion_settings[elementor_capture]" value="1" <?php checked( $settings['elementor_capture'], 1 ); ?>>
+				</div>
+
+				<div class="elbishion-setting-row">
+					<div>
+						<label for="elbishion-elementor-selected"><?php esc_html_e( 'Capture only selected Elementor forms', 'elbishion' ); ?></label>
+						<p><?php esc_html_e( 'When enabled, only Elementor forms whose form name appears in the allowlist below will be captured.', 'elbishion' ); ?></p>
+					</div>
+					<input id="elbishion-elementor-selected" type="checkbox" name="elbishion_settings[elementor_selected]" value="1" <?php checked( $settings['elementor_selected'], 1 ); ?>>
+				</div>
+
+				<div class="elbishion-setting-row">
+					<div>
+						<label for="elbishion-elementor-allowlist"><?php esc_html_e( 'Elementor form name allowlist', 'elbishion' ); ?></label>
+						<p><?php esc_html_e( 'Enter one Elementor form name per line, or separate names with commas.', 'elbishion' ); ?></p>
+					</div>
+					<textarea id="elbishion-elementor-allowlist" name="elbishion_settings[elementor_allowlist]" rows="5"><?php echo esc_textarea( $settings['elementor_allowlist'] ); ?></textarea>
 				</div>
 
 				<div class="elbishion-setting-row">

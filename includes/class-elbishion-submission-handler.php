@@ -21,7 +21,7 @@ class Elbishion_Submission_Handler {
 		add_shortcode( 'elbishion_form', array( __CLASS__, 'render_shortcode_form' ) );
 		add_action( 'init', array( __CLASS__, 'maybe_handle_shortcode_submission' ) );
 		add_action( 'elbishion_submission_saved', array( __CLASS__, 'maybe_send_notification' ), 10, 4 );
-		add_action( 'elementor_pro/forms/new_record', array( __CLASS__, 'capture_elementor_submission' ), 10, 2 );
+		add_action( 'elementor_pro/forms/new_record', array( __CLASS__, 'capture_elementor_submission_v2' ), 10, 2 );
 	}
 
 	/**
@@ -153,6 +153,7 @@ class Elbishion_Submission_Handler {
 			$fields,
 			array(
 				'page_url' => wp_get_referer(),
+				'source'   => 'shortcode',
 			)
 		);
 
@@ -169,6 +170,9 @@ class Elbishion_Submission_Handler {
 	 */
 	public static function capture_elementor_submission( $record, $handler ) {
 		unset( $handler );
+
+		self::capture_elementor_submission_v2( $record, null );
+		return;
 
 		if ( ! is_object( $record ) || ! method_exists( $record, 'get' ) ) {
 			return;
@@ -201,6 +205,161 @@ class Elbishion_Submission_Handler {
 				'page_url' => wp_get_referer(),
 			)
 		);
+	}
+
+	/**
+	 * Capture Elementor Pro Forms without interfering with native Elementor actions.
+	 *
+	 * @param object $record  Elementor record.
+	 * @param object $handler Elementor handler.
+	 */
+	public static function capture_elementor_submission_v2( $record, $handler ) {
+		unset( $handler );
+
+		$settings = Elbishion_Settings::get_settings();
+
+		if ( empty( $settings['elementor_capture'] ) ) {
+			return;
+		}
+
+		if ( ! is_object( $record ) || ! method_exists( $record, 'get' ) ) {
+			return;
+		}
+
+		$form_name = self::elementor_form_name( $record );
+
+		if ( ! self::should_capture_elementor_form( $form_name, $settings ) ) {
+			return;
+		}
+
+		$fields = $record->get( 'fields' );
+		$data   = array(
+			'form'   => array(
+				'name' => $form_name,
+			),
+			'fields' => array(),
+		);
+
+		if ( is_array( $fields ) ) {
+			foreach ( $fields as $field_key => $field ) {
+				if ( ! is_array( $field ) ) {
+					continue;
+				}
+
+				$field_id = ! empty( $field['id'] ) ? $field['id'] : $field_key;
+				$label    = ! empty( $field['title'] ) ? $field['title'] : $field_id;
+
+				if ( empty( $label ) ) {
+					$label = __( 'Field', 'elbishion' );
+				}
+
+				$data['fields'][] = array(
+					'id'    => $field_id,
+					'label' => $label,
+					'value' => self::normalize_elementor_field_value( $field['value'] ?? '' ),
+				);
+			}
+		}
+
+		if ( empty( $data['fields'] ) ) {
+			return;
+		}
+
+		elbishion_save_submission(
+			$form_name,
+			$data,
+			array(
+				'page_url' => self::elementor_page_url( $record ),
+				'source'   => 'elementor',
+			)
+		);
+	}
+
+	/**
+	 * Get a stable Elementor form name.
+	 *
+	 * @param object $record Elementor record.
+	 * @return string
+	 */
+	private static function elementor_form_name( $record ) {
+		$form_name = method_exists( $record, 'get_form_settings' ) ? $record->get_form_settings( 'form_name' ) : '';
+		$form_name = sanitize_text_field( (string) $form_name );
+
+		return $form_name ? $form_name : __( 'Elementor Form', 'elbishion' );
+	}
+
+	/**
+	 * Check Elementor capture settings for one form name.
+	 *
+	 * @param string $form_name Form name.
+	 * @param array  $settings Plugin settings.
+	 * @return bool
+	 */
+	private static function should_capture_elementor_form( $form_name, $settings ) {
+		if ( empty( $settings['elementor_selected'] ) ) {
+			return true;
+		}
+
+		$allowlist = self::parse_elementor_allowlist( $settings['elementor_allowlist'] ?? '' );
+
+		if ( empty( $allowlist ) ) {
+			return false;
+		}
+
+		return in_array( strtolower( trim( $form_name ) ), $allowlist, true );
+	}
+
+	/**
+	 * Parse selected Elementor form names.
+	 *
+	 * @param string $allowlist Raw allowlist.
+	 * @return array
+	 */
+	private static function parse_elementor_allowlist( $allowlist ) {
+		$items = preg_split( '/[\r\n,]+/', (string) $allowlist );
+		$items = array_filter( array_map( 'trim', (array) $items ) );
+
+		return array_values( array_unique( array_map( 'strtolower', $items ) ) );
+	}
+
+	/**
+	 * Keep Elementor field values JSON-safe.
+	 *
+	 * @param mixed $value Field value.
+	 * @return mixed
+	 */
+	private static function normalize_elementor_field_value( $value ) {
+		if ( is_scalar( $value ) || is_array( $value ) || null === $value ) {
+			return $value;
+		}
+
+		return '';
+	}
+
+	/**
+	 * Resolve the Elementor submission page URL without depending on Elementor internals.
+	 *
+	 * @param object $record Elementor record.
+	 * @return string
+	 */
+	private static function elementor_page_url( $record ) {
+		$meta = $record->get( 'meta' );
+
+		if ( is_array( $meta ) ) {
+			foreach ( array( 'page_url', 'referer', 'referrer' ) as $key ) {
+				if ( ! empty( $meta[ $key ] ) && is_scalar( $meta[ $key ] ) ) {
+					return esc_url_raw( $meta[ $key ] );
+				}
+			}
+		}
+
+		$referer = wp_get_referer();
+
+		if ( $referer ) {
+			return esc_url_raw( $referer );
+		}
+
+		return isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ) : '';
 	}
 
 	/**

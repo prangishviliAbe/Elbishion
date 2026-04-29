@@ -183,7 +183,8 @@
 .elbishion-filters input[type="date"],
 .elbishion-admin input[type="search"],
 .elbishion-admin input[type="email"],
-.elbishion-admin input[type="number"] {
+.elbishion-admin input[type="number"],
+.elbishion-admin textarea {
 	border-color: #d0d5dd;
 	border-radius: 6px;
 	min-height: 36px;
@@ -252,6 +253,33 @@
 .elbishion-badge-archived {
 	background: #f2f4f7;
 	color: #344054;
+}
+
+.elbishion-source-badge {
+	display: inline-flex;
+	align-items: center;
+	min-height: 22px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+	background: #f2f4f7;
+	color: #344054;
+}
+
+.elbishion-source-shortcode {
+	background: #eef4ff;
+	color: #3538cd;
+}
+
+.elbishion-source-elementor {
+	background: #fdf2fa;
+	color: #c11574;
+}
+
+.elbishion-source-api {
+	background: #ecfdf3;
+	color: #027a48;
 }
 
 .elbishion-detail-grid {
@@ -380,7 +408,8 @@
 }
 
 .elbishion-setting-row input[type="email"],
-.elbishion-setting-row input[type="number"] {
+.elbishion-setting-row input[type="number"],
+.elbishion-setting-row textarea {
 	width: 100%;
 }
 

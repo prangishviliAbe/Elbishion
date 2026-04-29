@@ -131,8 +131,9 @@ class Elbishion_Admin_Menu {
 		}
 
 		$data       = Elbishion_Database::decode_data( $submission->submitted_data );
-		$message    = self::find_message_field( $data );
-		$title      = self::submission_title( $submission, $data );
+		$display_data = self::display_data( $data );
+		$message    = self::find_message_field( $display_data );
+		$title      = self::submission_title( $submission, $display_data );
 		$status_badge = sprintf( '<span class="elbishion-badge elbishion-badge-%1$s">%2$s</span>', esc_attr( $submission->status ), esc_html( self::status_label( $submission->status ) ) );
 		?>
 		<div class="wrap elbishion-admin elbishion-detail-page">
@@ -157,7 +158,7 @@ class Elbishion_Admin_Menu {
 				<section class="elbishion-card elbishion-detail-main">
 					<h2><?php esc_html_e( 'შევსებული ველები', 'elbishion' ); ?></h2>
 					<div class="elbishion-field-grid">
-						<?php foreach ( $data as $key => $value ) : ?>
+						<?php foreach ( $display_data as $key => $value ) : ?>
 							<?php if ( strtolower( (string) $key ) === strtolower( (string) $message['key'] ) ) : ?>
 								<?php continue; ?>
 							<?php endif; ?>
@@ -183,6 +184,8 @@ class Elbishion_Admin_Menu {
 						<dd>#<?php echo esc_html( $submission->id ); ?></dd>
 						<dt><?php esc_html_e( 'ფორმის სახელი', 'elbishion' ); ?></dt>
 						<dd><?php echo esc_html( $submission->form_name ); ?></dd>
+						<dt><?php esc_html_e( 'Source', 'elbishion' ); ?></dt>
+						<dd><?php echo esc_html( self::source_label( isset( $submission->source ) ? $submission->source : 'api' ) ); ?></dd>
 						<dt><?php esc_html_e( 'გვერდის ბმული', 'elbishion' ); ?></dt>
 						<dd>
 							<?php if ( $submission->page_url ) : ?>
@@ -265,7 +268,7 @@ class Elbishion_Admin_Menu {
 			'elbishion_export'  => $type,
 		);
 
-		foreach ( array( 'status', 's', 'form_name', 'date_from', 'date_to', 'order' ) as $key ) {
+		foreach ( array( 'status', 'source', 's', 'form_name', 'date_from', 'date_to', 'order' ) as $key ) {
 			if ( isset( $_GET[ $key ] ) && '' !== $_GET[ $key ] ) {
 				$args[ $key ] = sanitize_text_field( wp_unslash( $_GET[ $key ] ) );
 			}
@@ -351,6 +354,38 @@ class Elbishion_Admin_Menu {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Convert structured Elementor JSON into a readable field map for admin detail views.
+	 *
+	 * @param array $data Submitted data.
+	 * @return array
+	 */
+	private static function display_data( $data ) {
+		if ( empty( $data['fields'] ) || ! is_array( $data['fields'] ) ) {
+			return $data;
+		}
+
+		$display = array();
+
+		foreach ( $data['fields'] as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			$label = ! empty( $field['label'] ) ? $field['label'] : ( $field['id'] ?? __( 'Field', 'elbishion' ) );
+			$value = $field['value'] ?? '';
+			$key   = $label;
+
+			if ( ! empty( $field['id'] ) && strtolower( (string) $field['id'] ) !== strtolower( (string) $label ) ) {
+				$key = sprintf( '%1$s (%2$s)', $label, $field['id'] );
+			}
+
+			$display[ $key ] = $value;
+		}
+
+		return $display;
 	}
 
 	/**
@@ -527,6 +562,16 @@ class Elbishion_Admin_Menu {
 	 * @param string $status Status key.
 	 * @return string
 	 */
+	private static function source_label( $source ) {
+		$labels = array(
+			'shortcode' => __( 'Shortcode', 'elbishion' ),
+			'elementor' => __( 'Elementor', 'elbishion' ),
+			'api'       => __( 'API', 'elbishion' ),
+		);
+
+		return $labels[ $source ] ?? __( 'API', 'elbishion' );
+	}
+
 	private static function status_label( $status ) {
 		$labels = array(
 			'unread'   => __( 'წაუკითხავი', 'elbishion' ),

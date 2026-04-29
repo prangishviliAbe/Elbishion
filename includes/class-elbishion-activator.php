@@ -28,6 +28,20 @@ class Elbishion_Activator {
 	}
 
 	/**
+	 * Run lightweight database upgrades when the plugin version changes.
+	 */
+	public static function maybe_upgrade() {
+		$installed_version = get_option( 'elbishion_db_version' );
+
+		if ( ELBISHION_VERSION === $installed_version ) {
+			return;
+		}
+
+		self::create_table();
+		update_option( 'elbishion_db_version', ELBISHION_VERSION );
+	}
+
+	/**
 	 * Create the submissions table.
 	 */
 	private static function create_table() {
@@ -44,12 +58,14 @@ class Elbishion_Activator {
 			page_url TEXT NULL,
 			user_ip VARCHAR(100) NULL,
 			user_agent TEXT NULL,
+			source VARCHAR(20) NOT NULL DEFAULT 'api',
 			submitted_data LONGTEXT NOT NULL,
 			status VARCHAR(20) NOT NULL DEFAULT 'unread',
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY form_name (form_name),
+			KEY source (source),
 			KEY status (status),
 			KEY created_at (created_at)
 		) {$charset_collate};";
