@@ -69,7 +69,7 @@ class Elbishion_Admin_List extends WP_List_Table {
 			'status'       => __( 'სტატუსი', 'elbishion' ),
 			'form_name'    => __( 'სახელი და გვარი', 'elbishion' ),
 			'contact'      => __( 'საკონტაქტო ინფორმაცია', 'elbishion' ),
-			'message'      => __( 'კურსის დასახელება', 'elbishion' ),
+			'message'      => __( 'შეტყობინება', 'elbishion' ),
 			'page_url'     => __( 'გვერდის ბმული', 'elbishion' ),
 			'created_at'   => __( 'თარიღი', 'elbishion' ),
 			'row_actions'  => __( 'ქმედებები', 'elbishion' ),
