@@ -1,5 +1,7 @@
 # Elbishion
 
+![Elbishion plugin cover](assets/elbishion.webp)
+
 Elbishion is a standalone WordPress form submissions manager. It stores submissions from the built-in shortcode form, a small developer API, and optionally Elementor Pro Forms. The plugin adds a dedicated WordPress admin workspace for searching, filtering, viewing, status management, CSV export, notifications, and privacy-related storage controls.
 
 ## Version
