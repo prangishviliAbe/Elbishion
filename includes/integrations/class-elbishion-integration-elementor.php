@@ -43,10 +43,16 @@ class Elbishion_Integration_Elementor {
 					continue;
 				}
 
+				$type = isset( $field['type'] ) ? sanitize_key( (string) $field['type'] ) : '';
+
+				if ( 'acceptance' === $type ) {
+					continue;
+				}
+
 				$fields[] = array(
 					'id'    => $field['id'] ?? $key,
-					'label' => $field['title'] ?? ( $field['id'] ?? $key ),
-					'type'  => $field['type'] ?? '',
+					'label' => ! empty( $field['title'] ) ? $field['title'] : ( $field['id'] ?? $key ),
+					'type'  => $type,
 					'value' => $field['value'] ?? '',
 				);
 			}

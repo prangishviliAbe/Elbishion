@@ -523,13 +523,17 @@ class Elbishion_Admin_Menu {
 				continue;
 			}
 
+			if ( self::should_hide_display_field( $field ) ) {
+				continue;
+			}
+
 			$original_label = ! empty( $field['field_label'] ) ? $field['field_label'] : ( $field['label'] ?? ( $field['field_id'] ?? ( $field['id'] ?? __( 'Field', 'elbishion' ) ) ) );
 			$value          = $field['field_value'] ?? ( $field['value'] ?? '' );
 			$field_id       = $field['field_id'] ?? ( $field['id'] ?? '' );
 			$label          = self::display_field_label( $original_label, $field_id, $value, $has_course_context );
 			$key            = $label;
 
-			if ( ! empty( $field_id ) && ! self::same_readable_label( $label, $field_id ) && ! self::label_was_corrected( $label, $original_label ) ) {
+			if ( ! empty( $field_id ) && ! self::same_readable_label( $label, $field_id ) && ! self::label_was_corrected( $label, $original_label ) && ! self::is_placeholder_label( $label ) ) {
 				$key = sprintf( '%1$s (%2$s)', $label, $field_id );
 			}
 
@@ -537,6 +541,77 @@ class Elbishion_Admin_Menu {
 		}
 
 		return $display;
+	}
+
+	/**
+	 * Hide non-content fields from the admin detail view.
+	 *
+	 * @param array $field Normalized field.
+	 * @return bool
+	 */
+	private static function should_hide_display_field( $field ) {
+		$type  = strtolower( (string) ( $field['field_type'] ?? ( $field['type'] ?? '' ) ) );
+		$label = (string) ( $field['field_label'] ?? ( $field['label'] ?? '' ) );
+		$id    = (string) ( $field['field_id'] ?? ( $field['id'] ?? '' ) );
+		$value = $field['field_value'] ?? ( $field['value'] ?? '' );
+
+		if ( in_array( $type, array( 'acceptance', 'terms', 'terms_conditions' ), true ) ) {
+			return true;
+		}
+
+		foreach ( array( $label, $id ) as $text ) {
+			if ( preg_match( '/(^|[_\-\s])acceptance([_\-\s]|$)/i', (string) $text ) ) {
+				return true;
+			}
+		}
+
+		if ( ! self::is_placeholder_label( $label ) || ! self::is_generated_field_id( $id ) ) {
+			return false;
+		}
+
+		if ( self::is_empty_value( $value ) ) {
+			return true;
+		}
+
+		return is_scalar( $value ) && in_array( strtolower( trim( (string) $value ) ), array( 'on', '1', 'true' ), true );
+	}
+
+	/**
+	 * Check for labels created only as a fallback.
+	 *
+	 * @param string $label Field label.
+	 * @return bool
+	 */
+	private static function is_placeholder_label( $label ) {
+		$label = trim( self::humanize_key( $label ) );
+
+		return '' === $label || 'Field' === $label || preg_match( '/^Field\s+[a-f0-9]{5,}$/i', $label );
+	}
+
+	/**
+	 * Check for generated Elementor-style field IDs.
+	 *
+	 * @param string $field_id Field ID.
+	 * @return bool
+	 */
+	private static function is_generated_field_id( $field_id ) {
+		$field_id = trim( self::humanize_key( $field_id ) );
+
+		return (bool) preg_match( '/^Field\s+[a-f0-9]{5,}$/i', $field_id );
+	}
+
+	/**
+	 * Check if a field value is empty after normalization.
+	 *
+	 * @param mixed $value Field value.
+	 * @return bool
+	 */
+	private static function is_empty_value( $value ) {
+		if ( is_array( $value ) ) {
+			return empty( array_filter( $value ) );
+		}
+
+		return '' === trim( (string) $value );
 	}
 
 	/**

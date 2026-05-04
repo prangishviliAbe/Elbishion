@@ -6,9 +6,9 @@ Elbishion is a standalone WordPress form submissions manager. It stores submissi
 
 ## Version
 
-Current version: `2.0.5`
+Current version: `2.0.6`
 
-Recommended Git tag: `v2.0.5`
+Recommended Git tag: `v2.0.6`
 
 Author: Abe Prangishvili
 
@@ -363,6 +363,14 @@ elbishion/
 ├── uninstall.php
 └── README.md
 ```
+
+## Changelog
+
+### 2.0.6
+
+- Hide Elementor acceptance/terms fields from stored submissions.
+- Hide previously stored acceptance fallback fields from the admin detail view.
+- Avoid showing generated fallback IDs such as `Field (Field 5F00AAB)` for placeholder labels.
 
 ## Release Checklist
 

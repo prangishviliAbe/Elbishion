@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Elbishion
  * Description: Universal WordPress form submissions manager with a standalone inbox, integrations, CSV export, privacy controls, and developer APIs.
- * Version: 2.0.5
+ * Version: 2.0.6
  * Author: Abe Prangishvili
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ELBISHION_VERSION', '2.0.5' );
+define( 'ELBISHION_VERSION', '2.0.6' );
 define( 'ELBISHION_PLUGIN_FILE', __FILE__ );
 define( 'ELBISHION_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ELBISHION_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

@@ -37,6 +37,10 @@ class Elbishion_Privacy {
 		$label    = strtolower( (string) $label );
 		$type     = strtolower( (string) $type );
 
+		if ( self::is_acceptance_field( $field_id, $label, $type ) ) {
+			return true;
+		}
+
 		if ( in_array( $type, array( 'password', 'credit_card', 'card', 'card_number', 'cvv', 'cvc' ), true ) ) {
 			return true;
 		}
@@ -53,6 +57,28 @@ class Elbishion_Privacy {
 			}
 
 			if ( false !== strpos( $field_id, $keyword ) || false !== strpos( $label, $keyword ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Detect fields that only confirm terms/acceptance and should not be stored.
+	 *
+	 * @param string $field_id Field ID/name.
+	 * @param string $label Field label.
+	 * @param string $type Field type.
+	 * @return bool
+	 */
+	private static function is_acceptance_field( $field_id, $label = '', $type = '' ) {
+		if ( in_array( $type, array( 'acceptance', 'terms', 'terms_conditions' ), true ) ) {
+			return true;
+		}
+
+		foreach ( array( $field_id, $label ) as $value ) {
+			if ( preg_match( '/(^|[_\-\s])acceptance([_\-\s]|$)/', (string) $value ) ) {
 				return true;
 			}
 		}
